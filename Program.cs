@@ -11,6 +11,7 @@ using System.Runtime.InteropServices.ComTypes;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Serialization;
 using Octokit;
 using RestSharp;
 using RestSharp.Extensions;
@@ -19,10 +20,69 @@ namespace StudentContributionConsole
 {
     class Program
     {
+        private static readonly Dictionary<string, string> groupNames = new Dictionary<string, string>
+        {
+            {"Long Island Iced Tea", "long-island-iced-tea"},
+            {"Fuzzy Navel", "fuzzy-navel"},
+            {"Salty Chiwawa", "SaltyChiwawa"},
+            {"Three Legged Monkey", "three-legged-monkey"}
+        };
+
         static void Main(string[] args)
         {
-            var requestContext = new RequestContext();
-            requestContext.GetCommitsForRepo("repos/long-island-iced-tea/bangazon/stats/contributors");
+            var run = true;
+
+            while (run)
+            {
+                Console.WriteLine("Which group would you like to see commit history for?");
+    
+                var counter = 0;
+                
+                foreach (var group in groupNames)
+                {
+                    counter++;
+                    Console.WriteLine($"{counter}. {group.Key}");
+                }
+    
+                Console.Write("Please select an option from above and hit enter: ");
+                var selectedGroup = Console.ReadLine();
+                var selectedGroupKey = int.Parse(selectedGroup) - 1;
+    
+    
+                var requestContext = new RequestContext();
+    
+                var reposToCheck = requestContext.GetReposForGroup(groupNames.Values.ElementAt(selectedGroupKey));
+    
+                counter = 0;
+                
+                foreach (var repo in reposToCheck)
+                {
+                    counter++;
+                    Console.WriteLine($"{counter}. {repo.Name}: {repo.HtmlUrl}");
+                }
+                
+                Console.Write("Please select an option from above and hit enter: ");
+                var selectedRepo = Console.ReadLine();
+                var selectedRepoKey = int.Parse(selectedRepo) - 1;
+    
+                var commitStats = requestContext.GetCommitsForRepo($"repos/{groupNames.Values.ElementAt(selectedGroupKey)}/{reposToCheck[selectedRepoKey].Name}/stats/contributors");
+                
+                foreach (var result in commitStats)
+                {
+                    var totalAdditions = result.Weeks.Sum(x => x.A);
+                    var totalDeletions = result.Weeks.Sum(x => x.D);
+                    Console.WriteLine($"{result.Author.Login} has made {result.Total} commits since {DateTimeOffset.FromUnixTimeSeconds(result.Weeks[0].W)} with {totalAdditions} added lines of code and {totalDeletions} deleted lines of code");
+                }
+    
+                Console.Write("Type q and then enter to quit or enter to check another repo: ");
+                var continueApp = Console.ReadLine();
+    
+                if (continueApp == "q")
+                    run = false;
+                
+                Console.Clear();
+                
+            }
         }
     }
 
@@ -30,7 +90,7 @@ namespace StudentContributionConsole
     {
         private string baseUrl = "https://api.github.com/";
         
-        public void GetCommitsForRepo(string requestEndpoint)
+        public Welcome[] GetCommitsForRepo(string requestEndpoint)
         {
             var client = new RestClient(baseUrl);
             
@@ -39,30 +99,39 @@ namespace StudentContributionConsole
             request.AddHeader("user-agent", "NSS-Commit-Tracker (Darwin 18.0.0 Darwin Kernel Version 18.0.0: Wed Aug 22 20:13:40 PDT 2018; root:xnu-4903.201.2~1/RELEASE_X86_64; x64; en-US;)");
 
             var response = client.Execute(request);
-
+           
+            
             var deserializedResult = Welcome.FromJson(response.Content);
 
-            Console.ReadKey();
+            return deserializedResult;
+
         }
 
-        private List<ContributorStats> ConvertToObject(JObject obj)
+        public List<Repo> GetReposForGroup(string orgName)
         {
-            var contributors = new List<ContributorStats>();
-            foreach (var item in obj)
-            {
-                var contributor = new ContributorStats();
-                contributor.Total = obj[0].Value<int>("total");
-                //contributor.Weeks = obj[0].Values<CommitStats>("weeks").ToList();
-                contributor.Author = obj[0]["author"].Value<string>("login");
-                
-                contributors.Add(contributor);
-            }
+            var client = new RestClient(baseUrl);
+            var request = new RestRequest();
+            request.Resource = $"users/{orgName}/repos";
+            request.AddHeader("user-agent", "NSS-Commit-Tracker (Darwin 18.0.0 Darwin Kernel Version 18.0.0: Wed Aug 22 20:13:40 PDT 2018; root:xnu-4903.201.2~1/RELEASE_X86_64; x64; en-US;)");
 
-            return contributors;
+            var response = client.Execute(request);
+            
+            var deserializedResult = JsonConvert.DeserializeObject<List<Repo>>(response.Content);
+
+            return deserializedResult; 
         }
     }
-    
-        public partial class Welcome
+
+    public class Repo
+    {
+        [JsonProperty("name")] 
+        public string Name { get; set; }
+
+        [JsonProperty("html_url")] 
+        public string HtmlUrl { get; set; }
+    }
+
+    public partial class Welcome
     {
         [JsonProperty("total")]
         public long Total { get; set; }
