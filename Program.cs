@@ -1,15 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Net.Cache;
-using System.Net.Http;
-using System.Reflection.Metadata.Ecma335;
-using System.Runtime.InteropServices.ComTypes;
-using Newtonsoft.Json.Linq;
-using Newtonsoft.Json.Serialization;
-using Octokit;
-using RestSharp.Extensions;
 
 namespace StudentContributionConsole
 {
