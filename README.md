@@ -17,5 +17,7 @@
 
 * Clone the repo
 * in the command line:
-	* `cd StudentContributionConsole/bin/Debug/netcoreapp2.1`
+	* `cd StudentContributionConsole`
+	* `dotnet publish`
+	* `cd bin/Debug/netcoreapp2.1`
 	* `dotnet StudentContributionConsole.dll`
