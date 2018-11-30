@@ -50,7 +50,13 @@ namespace StudentContributionConsole
     
     
                 var requestContext = new RequestContext();
-    
+
+                if (groupNames.Values.ElementAtOrDefault(selectedGroupKey) == null)
+                {
+                    Console.Clear();
+                    continue;
+                }
+
                 var reposToCheck = requestContext.GetReposForGroup(groupNames.Values.ElementAt(selectedGroupKey));
     
                 counter = 0;
@@ -64,8 +70,20 @@ namespace StudentContributionConsole
                 Console.Write("Please select an option from above and hit enter: ");
                 var selectedRepo = Console.ReadLine();
                 var selectedRepoKey = int.Parse(selectedRepo) - 1;
+                
+
     
                 var commitStats = requestContext.GetCommitsForRepo($"repos/{groupNames.Values.ElementAt(selectedGroupKey)}/{reposToCheck[selectedRepoKey].Name}/stats/contributors");
+
+                if (commitStats.Length == 0)
+                {
+                    Console.WriteLine("Sorry, either there is no contribution information for this repo, or the Github API is being trash. Press enter and let's try this again!");
+                    Console.ReadLine();
+                    Console.Clear();
+                    continue;
+                }
+
+                
                 
                 foreach (var result in commitStats)
                 {
@@ -90,7 +108,7 @@ namespace StudentContributionConsole
     {
         private string baseUrl = "https://api.github.com/";
         
-        public Welcome[] GetCommitsForRepo(string requestEndpoint)
+        public RepoStats[] GetCommitsForRepo(string requestEndpoint)
         {
             var client = new RestClient(baseUrl);
             
@@ -98,10 +116,23 @@ namespace StudentContributionConsole
             request.Resource = requestEndpoint;
             request.AddHeader("user-agent", "NSS-Commit-Tracker (Darwin 18.0.0 Darwin Kernel Version 18.0.0: Wed Aug 22 20:13:40 PDT 2018; root:xnu-4903.201.2~1/RELEASE_X86_64; x64; en-US;)");
 
-            var response = client.Execute(request);
+            IRestResponse response;
+            try
+            {
+                response = client.Execute(request);
+            }
+            finally
+            {
+                response = client.Execute(request);
+            }
            
+            if (response.StatusCode != HttpStatusCode.OK)
+            {
+                    Console.Clear();
+                    return new RepoStats[0]; 
+            }
             
-            var deserializedResult = Welcome.FromJson(response.Content);
+            var deserializedResult = RepoStats.FromJson(response.Content);
 
             return deserializedResult;
 
@@ -115,10 +146,10 @@ namespace StudentContributionConsole
             request.AddHeader("user-agent", "NSS-Commit-Tracker (Darwin 18.0.0 Darwin Kernel Version 18.0.0: Wed Aug 22 20:13:40 PDT 2018; root:xnu-4903.201.2~1/RELEASE_X86_64; x64; en-US;)");
 
             var response = client.Execute(request);
-            
+           
             var deserializedResult = JsonConvert.DeserializeObject<List<Repo>>(response.Content);
-
             return deserializedResult; 
+            
         }
     }
 
@@ -131,7 +162,7 @@ namespace StudentContributionConsole
         public string HtmlUrl { get; set; }
     }
 
-    public partial class Welcome
+    public partial class RepoStats
     {
         [JsonProperty("total")]
         public long Total { get; set; }
@@ -143,7 +174,7 @@ namespace StudentContributionConsole
         public Author Author { get; set; }
     }
 
-    public partial class Author
+    public class Author
     {
         [JsonProperty("login")]
         public string Login { get; set; }
@@ -200,7 +231,7 @@ namespace StudentContributionConsole
         public bool SiteAdmin { get; set; }
     }
 
-    public partial class Week
+    public class Week
     {
         [JsonProperty("w")]
         public long W { get; set; }
@@ -215,14 +246,14 @@ namespace StudentContributionConsole
         public long C { get; set; }
     }
 
-    public partial class Welcome
+    public partial class RepoStats
     {
-        public static Welcome[] FromJson(string json) => JsonConvert.DeserializeObject<Welcome[]>(json, StudentContributionConsole.Converter.Settings);
+        public static RepoStats[] FromJson(string json) => JsonConvert.DeserializeObject<RepoStats[]>(json, StudentContributionConsole.Converter.Settings);
     }
 
     public static class Serialize
     {
-        public static string ToJson(this Welcome[] self) => JsonConvert.SerializeObject(self, StudentContributionConsole.Converter.Settings);
+        public static string ToJson(this RepoStats[] self) => JsonConvert.SerializeObject(self, StudentContributionConsole.Converter.Settings);
     }
 
     internal static class Converter
